@@ -1,7 +1,7 @@
 package com.example.uts_biodata_pribadi
 
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
+//import android.os.Parcelable
+//import kotlinx.parcelize.Parcelize
 import java.io.Serializable
 
 data class Biodata(
