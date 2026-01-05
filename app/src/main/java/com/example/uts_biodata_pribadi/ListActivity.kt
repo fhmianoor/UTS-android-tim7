@@ -3,14 +3,18 @@ package com.example.uts_biodata_pribadi
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.appcompat.widget.SearchView
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.uts_biodata_pribadi.databinding.ActivityListBinding
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class ListActivity : AppCompatActivity() {
+
     private lateinit var binding: ActivityListBinding
-    private lateinit var db: DatabaseHelper
     private lateinit var adapter: BiodataAdapter
     private var mode: String? = null
 
@@ -21,7 +25,6 @@ class ListActivity : AppCompatActivity() {
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        db = DatabaseHelper(this)
         mode = intent.getStringExtra("mode")
 
         setupRecyclerView()
@@ -41,7 +44,7 @@ class ListActivity : AppCompatActivity() {
             when (mode) {
                 "edit" -> {
                     val intent = Intent(this, AddEditActivity::class.java)
-                    intent.putExtra("biodata", biodata)
+                    intent.putExtra("biodata", biodata) // Pasti Parcelize
                     startActivity(intent)
                 }
                 "hapus" -> {
@@ -49,8 +52,7 @@ class ListActivity : AppCompatActivity() {
                         .setTitle("Hapus Data")
                         .setMessage("Yakin ingin menghapus ${biodata.nama}?")
                         .setPositiveButton("Ya") { _, _ ->
-                            db.deleteBiodata(biodata.id)
-                            loadData()
+                            hapusDataApi(biodata.id)
                         }
                         .setNegativeButton("Tidak", null)
                         .show()
@@ -71,15 +73,13 @@ class ListActivity : AppCompatActivity() {
                 }
             }
         }
+
         binding.recyclerView.adapter = adapter
     }
 
     private fun setupSearchView() {
-        binding.searchView.setOnQueryTextListener(object: SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                return false
-            }
-
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?) = false
             override fun onQueryTextChange(newText: String?): Boolean {
                 filterList(newText.orEmpty())
                 return true
@@ -88,24 +88,44 @@ class ListActivity : AppCompatActivity() {
     }
 
     private fun filterList(query: String) {
-        val filtered = if (query.isEmpty()) {
-            biodataList
-        } else {
-            biodataList.filter {
-                it.nama.contains(query, ignoreCase = true) ||
-                        it.alamat.contains(query, ignoreCase = true) ||
-                        it.pekerjaan.contains(query, ignoreCase = true)
-            }
+        val filtered = if (query.isEmpty()) biodataList
+        else biodataList.filter {
+            it.nama.contains(query, true) ||
+                    it.alamat.contains(query, true) ||
+                    it.pekerjaan.contains(query, true)
         }
-        adapter.updateData(filtered.toList())
+        adapter.updateData(filtered)
     }
 
+    // 🔥 GET ALL DATA DARI API
     private fun loadData() {
-        val dataDariDb = db.getAllBiodata()
+        ApiClient.api.getAll().enqueue(object : Callback<List<Biodata>> {
+            override fun onResponse(call: Call<List<Biodata>>, response: Response<List<Biodata>>) {
+                if (response.isSuccessful) {
+                    biodataList.clear()
+                    biodataList.addAll(response.body() ?: emptyList())
+                    adapter.updateData(biodataList)
+                } else {
+                    Log.e("API", "Gagal load data: ${response.code()}")
+                }
+            }
 
-        biodataList.clear()
-        biodataList.addAll(dataDariDb)
+            override fun onFailure(call: Call<List<Biodata>>, t: Throwable) {
+                Log.e("API", "Error: ${t.message}")
+            }
+        })
+    }
 
-        adapter.updateData(biodataList)
+    // 🔥 DELETE DATA KE API
+    private fun hapusDataApi(id: Int) {
+        ApiClient.api.delete(id).enqueue(object : Callback<Void> {
+            override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                if (response.isSuccessful) loadData()
+                else Log.e("API", "Gagal hapus: ${response.code()}")
+            }
+            override fun onFailure(call: Call<Void>, t: Throwable) {
+                Log.e("API", "Error hapus: ${t.message}")
+            }
+        })
     }
 }

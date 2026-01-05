@@ -1,14 +1,13 @@
 package com.example.uts_biodata_pribadi
 
-//import android.os.Parcelable
-//import kotlinx.parcelize.Parcelize
-import java.io.Serializable
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 
+@Parcelize
 data class Biodata(
     var id: Int = 0,
     var nama: String,
-    var umur: String,
     var alamat: String,
+    var umur: String,
     var pekerjaan: String
-) : Serializable
-
+) : Parcelable

@@ -4,10 +4,13 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.uts_biodata_pribadi.databinding.ActivityAddEditBinding
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class AddEditActivity : AppCompatActivity() {
+
     private lateinit var binding: ActivityAddEditBinding
-    private lateinit var db: DatabaseHelper
     private var biodata: Biodata? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -15,37 +18,74 @@ class AddEditActivity : AppCompatActivity() {
         binding = ActivityAddEditBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        db = DatabaseHelper(this)
-        biodata = intent.getSerializableExtra("biodata") as? Biodata
+        // 🔥 Ambil data dari intent (Parcelable Extension)
+        biodata = intent.getParcelableCompat("biodata")
 
-        if (biodata != null) {
-            binding.etNama.setText(biodata!!.nama)
-            binding.etUmur.setText(biodata!!.umur)
-            binding.etAlamat.setText(biodata!!.alamat)
-            binding.etPekerjaan.setText(biodata!!.pekerjaan)
+        // Jika edit mode
+        biodata?.let {
+            binding.etNama.setText(it.nama)
+            binding.etUmur.setText(it.umur)
+            binding.etAlamat.setText(it.alamat)
+            binding.etPekerjaan.setText(it.pekerjaan)
             binding.btnSave.text = "Update Data"
         }
 
         binding.btnSave.setOnClickListener {
-            val nama = binding.etNama.text.toString()
-            val umur = binding.etUmur.text.toString()
-            val alamat = binding.etAlamat.text.toString()
-            val pekerjaan = binding.etPekerjaan.text.toString()
+            simpanData()
+        }
+    }
 
-            if (nama.isEmpty() || umur.isEmpty() || alamat.isEmpty() || pekerjaan.isEmpty()) {
-                Toast.makeText(this, "Lengkapi semua field", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+    private fun simpanData() {
+        val nama = binding.etNama.text.toString().trim()
+        val umur = binding.etUmur.text.toString().trim()
+        val alamat = binding.etAlamat.text.toString().trim()
+        val pekerjaan = binding.etPekerjaan.text.toString().trim()
 
-            if (biodata == null) {
-                db.insertBiodata(Biodata(0, nama, umur, alamat, pekerjaan))
-                Toast.makeText(this, "Data berhasil disimpan", Toast.LENGTH_SHORT).show()
-            } else {
-                db.updateBiodata(Biodata(biodata!!.id, nama, umur, alamat, pekerjaan))
-                Toast.makeText(this, "Data berhasil diperbarui", Toast.LENGTH_SHORT).show()
-            }
+        if (nama.isEmpty() || umur.isEmpty() || alamat.isEmpty() || pekerjaan.isEmpty()) {
+            Toast.makeText(this, "Lengkapi semua field", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-            finish()
+        val data = Biodata(
+            id = biodata?.id ?: 0,
+            nama = nama,
+            umur = umur,
+            alamat = alamat,
+            pekerjaan = pekerjaan
+        )
+
+        if (biodata == null) {
+            // ➕ INSERT (POST)
+            ApiClient.api.insert(data).enqueue(object : Callback<Biodata> {
+                override fun onResponse(call: Call<Biodata>, response: Response<Biodata>) {
+                    if (response.isSuccessful) {
+                        Toast.makeText(this@AddEditActivity, "Data berhasil disimpan", Toast.LENGTH_SHORT).show()
+                        finish()
+                    } else {
+                        Toast.makeText(this@AddEditActivity, "Gagal menyimpan data", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onFailure(call: Call<Biodata>, t: Throwable) {
+                    Toast.makeText(this@AddEditActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                }
+            })
+        } else {
+            // ✏️ UPDATE (PUT)
+            ApiClient.api.update(biodata!!.id, data).enqueue(object : Callback<Biodata> {
+                override fun onResponse(call: Call<Biodata>, response: Response<Biodata>) {
+                    if (response.isSuccessful) {
+                        Toast.makeText(this@AddEditActivity, "Data berhasil diperbarui", Toast.LENGTH_SHORT).show()
+                        finish()
+                    } else {
+                        Toast.makeText(this@AddEditActivity, "Gagal update data", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onFailure(call: Call<Biodata>, t: Throwable) {
+                    Toast.makeText(this@AddEditActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                }
+            })
         }
     }
 }
